@@ -23,6 +23,8 @@ class Webcam:
         self.max_exposure = 10
         self.min_exposure = 0
 
+        self.savefmt = '.png'
+
     def get_frame(self):
         ret, frame = self.camera.read()
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -31,6 +33,9 @@ class Webcam:
 
     def set_exposure(self):
         pass
+
+    def close(self):
+        self.camera.release()
 
 
 class LIOV7251Stereo(Camera):
@@ -42,3 +47,5 @@ class LIOV7251Stereo(Camera):
         self.min_exposure = 0
         self.channels = 1
         self.bitdepth = 8
+
+        self.savefmt = '.pgm'
