@@ -198,8 +198,8 @@ if __name__ == '__main__':
     from pyv4l2.camera import Camera
     # cam = Camera('/dev/video0')
     from cameras import Webcam, LIOV7251Stereo
-    cam = Webcam()
-    # cam = LIOV7251Stereo('/dev/video1')
+    # cam = Webcam()
+    cam = LIOV7251Stereo('/dev/video0')
     app = QApplication([])
     from trackers import GUIStereoTracker
     tracker = None
