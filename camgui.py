@@ -51,7 +51,7 @@ class ImageDisplayWidget(QLabel):
             self.width = self.camera.width
             self.height = self.camera.height
             self.channels = self.camera.channels
-            self.bitdepth = self.bitdepth
+            self.bitdepth = self.camera.bitdepth
             self.qformat = self.camera.qformat
         else:
             self.width = 640
@@ -75,12 +75,12 @@ class StartWindow(QMainWindow):
         self.camera = camera
 
         self.central_widget = QWidget()
-        self.image_display = ImageDisplayWidget()
+        self.image_display = ImageDisplayWidget(self.camera)
         self.button_frame = QPushButton('Acquire single frame', self.central_widget)
         self.button_track = QPushButton('Toggle tracking', self.central_widget)
         self.button_frames = QPushButton('Acquire frames', self.central_widget)
 
-        self.widget_exp = ExposureControlWidget()
+        self.widget_exp = ExposureControlWidget(self.camera)
 
         # Add save directory option.
         self.widget_savedir = QWidget()
@@ -196,8 +196,9 @@ class MovieThread(QThread):
 if __name__ == '__main__':
     from pyv4l2.camera import Camera
     # cam = Camera('/dev/video0')
-    from cameras import Webcam
-    cam = Webcam()
+    from cameras import Webcam, LIOV7251Stereo
+    # cam = Webcam()
+    cam = LIOV7251Stereo('/dev/video0')
     app = QApplication([])
     from trackers import GUIStereoTracker
     tracker = None
