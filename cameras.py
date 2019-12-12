@@ -1,6 +1,7 @@
 import cv2
 from PyQt5.QtGui import QImage
 import numpy as np
+from pyv4l2.camera import Camera
 
 
 class Webcam:
@@ -30,3 +31,14 @@ class Webcam:
 
     def set_exposure(self):
         pass
+
+
+class LIOV7251Stereo(Camera):
+    def __init__(self, device_path):
+        super().__init__()
+
+        self.qformat = QImage.Format_Grayscale8
+        self.max_exposure = 31
+        self.min_exposure = 0
+        self.channels = 1
+        self.bitdepth = 8
