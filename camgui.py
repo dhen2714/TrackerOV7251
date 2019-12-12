@@ -172,7 +172,7 @@ class MovieThread(QThread):
                 frame, t = self.camera.get_frame()
 
                 if self.write and self.write_num:
-                    outname = '{}.pgm'.format(t)
+                    outname = str(t) + self.camera.savefmt
                     if self.savedir:
                         outpath = os.path.join(self.savedir, outname)
                     else:
@@ -198,8 +198,8 @@ if __name__ == '__main__':
     from pyv4l2.camera import Camera
     # cam = Camera('/dev/video0')
     from cameras import Webcam, LIOV7251Stereo
-    # cam = Webcam()
-    cam = LIOV7251Stereo('/dev/video0')
+    cam = Webcam()
+    # cam = LIOV7251Stereo('/dev/video1')
     app = QApplication([])
     from trackers import GUIStereoTracker
     tracker = None
@@ -207,3 +207,4 @@ if __name__ == '__main__':
     window = StartWindow(cam, tracker)
     window.show()
     app.exit(app.exec_())
+    cam.close()
