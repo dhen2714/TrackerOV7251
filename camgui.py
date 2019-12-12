@@ -1,4 +1,5 @@
 import os
+import cv2
 import numpy as np
 from PyQt5.QtCore import Qt, QThread, QTimer, pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QMainWindow, QWidget, QPushButton, QVBoxLayout, QApplication, QSlider, QLabel, QLineEdit, QFormLayout, QInputDialog, QSlider
