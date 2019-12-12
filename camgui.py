@@ -5,21 +5,82 @@ from PyQt5.QtWidgets import QMainWindow, QWidget, QPushButton, QVBoxLayout, QApp
 from PyQt5.QtGui import QImage, QPixmap
 
 
+class ExposureControlWidget(QWidget):
+    """
+    Get max exposure, min exposure for given camera
+    """
+    def __init__(self, camera=None, tick_interval=1):
+        super().__init__()
+        self.camera = camera
+        self.tick_interval = tick_interval
+        
+        if self.camera:
+            self.max = self.camera.max_exposure
+            self.min = self.camera.min_exposure
+        else:
+            self.max = 10
+            self.min = 0
+
+        self.label = QLabel()
+        self.label.setText('Exposure control:')
+        self.slider = QSlider(Qt.Horizontal)
+        self.slider.setMinimum(self.min)
+        self.slider.setMaximum(self.max)
+        self.slider.setValue(self.max)
+        self.slider.setTickPosition(QSlider.TicksBelow)
+        self.slider.setTickInterval(self.tick_interval)
+
+        self.layout = QVBoxLayout(self)
+        self.layout.addWidget(self.label)
+        self.layout.addWidget(self.slider)
+
+        self.slider.valueChanged.connect(self.change_exposure)
+
+    def change_exposure(self):
+        if self.camera:
+            exp = self.slider.value()
+            self.camera.set_exposure(exp)
+
+
+class ImageDisplayWidget(QLabel):
+    def __init__(self, camera=None):
+        super().__init__()
+        self.camera = camera
+
+        if self.camera:
+            self.width = self.camera.width
+            self.height = self.camera.height
+            self.channels = self.camera.channels
+            self.bitdepth = self.bitdepth
+            self.qformat = self.camera.qformat
+        else:
+            self.width = 640
+            self.height = 480
+            self.channels = 1
+            self.bitdepth = 8
+            self.qformat = QImage.Format_Grayscale8
+
+        nullimg = np.zeros((self.height, self.width, self.channels))
+        qimg = QImage(nullimg, self.width, self.height, self.qformat)
+        self.setPixmap(QPixmap.fromImage(qimg))
+
+    @pyqtSlot(QImage)
+    def update_image(self, image):
+        self.setPixmap(QPixmap.fromImage(image))
+
+
 class StartWindow(QMainWindow):
     def __init__(self, camera=None, tracker=None):
         super().__init__()
         self.camera = camera
 
         self.central_widget = QWidget()
-        self.img_widget = QLabel()
+        self.image_display = ImageDisplayWidget()
         self.button_frame = QPushButton('Acquire single frame', self.central_widget)
         self.button_track = QPushButton('Toggle tracking', self.central_widget)
         self.button_frames = QPushButton('Acquire frames', self.central_widget)
 
-        nullimg = np.zeros((480, 1280, 3), dtype=np.uint8)
-        qimage = QImage(nullimg, 1280, 480, QImage.Format_Grayscale8)
-
-        self.img_widget.setPixmap(QPixmap.fromImage(qimage))
+        self.widget_exp = ExposureControlWidget()
 
         # Add save directory option.
         self.widget_savedir = QWidget()
@@ -29,36 +90,21 @@ class StartWindow(QMainWindow):
         self.button_savedir = QPushButton('Directory for saved images:')
         self.layout_savedir.addRow(self.button_savedir, self.label_savedir)
 
-        # Add slider for exposure control
-        self.widget_exp = QWidget()
-        self.layout_exp = QVBoxLayout(self.widget_exp)
-        self.label_exp = QLabel()
-        self.label_exp.setText(str('Exposure control:'))
-        self.slider_exp = QSlider(Qt.Horizontal)
-        self.slider_exp.setMinimum(0)
-        self.slider_exp.setMaximum(31)
-        self.slider_exp.setValue(31)
-        self.slider_exp.setTickPosition(QSlider.TicksBelow)
-        self.slider_exp.setTickInterval(1)
-        self.layout_exp.addWidget(self.label_exp)
-        self.layout_exp.addWidget(self.slider_exp)
-
         self.layout = QVBoxLayout(self.central_widget)
         self.layout.addWidget(self.button_frame)
         self.layout.addWidget(self.button_frames)
         self.layout.addWidget(self.widget_savedir)
         self.layout.addWidget(self.widget_exp)
-        self.layout.addWidget(self.img_widget)
+        self.layout.addWidget(self.image_display)
         self.layout.addWidget(self.button_track)
         self.setCentralWidget(self.central_widget)
 
         self.button_frame.clicked.connect(self.get_frame)
         self.button_frames.clicked.connect(self.get_frames)
         self.button_savedir.clicked.connect(self.get_savedir)
-        self.slider_exp.valueChanged.connect(self.change_exposure)
 
         self.movie_thread = MovieThread(self.camera, tracker)
-        self.movie_thread.changePixmap.connect(self.update_img)
+        self.movie_thread.changePixmap.connect(self.image_display.update_image)
         self.button_track.clicked.connect(self.movie_thread.update_track)
         self.movie_thread.start()
 
@@ -80,11 +126,12 @@ class StartWindow(QMainWindow):
         savedir, ret = QInputDialog.getText(self, 'Input', 'Enter path to directory in which images are to be saved:')
         if ret:
             self.savedir = str(savedir)
-            # self.line_edit_savedir.setText(str(savedir))
+            self.line_edit_savedir.setText(str(savedir))
             self.label_savedir.setText(str(savedir))
 
     def change_exposure(self):
-        exp = self.slider_exp.value()
+        # exp = self.slider_exp.value()
+        exp = self.widget_exp.slider.value()
         self.camera.set_exposure(exp)
 
 
@@ -120,34 +167,37 @@ class MovieThread(QThread):
 
     def run(self):
         while True:
-            frame, t = self.camera.get_frame()
+            if self.camera:
+                frame, t = self.camera.get_frame()
 
-            if self.write and self.write_num:
-                outname = '{}.pgm'.format(t)
-                if self.savedir:
-                    outpath = os.path.join(self.savedir, outname)
+                if self.write and self.write_num:
+                    outname = '{}.pgm'.format(t)
+                    if self.savedir:
+                        outpath = os.path.join(self.savedir, outname)
+                    else:
+                        outpath = outname
+                    
+                    if cv2.imwrite(outpath, frame):
+                        print('Image saved:', outpath)
+                    else:
+                        print('Could not save to', outpath)
+                    self.write_num -= 1
                 else:
-                    outpath = outname
-                
-                if cv2.imwrite(outpath, frame):
-                    print('Image saved:', outpath)
-                else:
-                    print('Could not save to', outpath)
-                self.write_num -= 1
-            else:
-                self.write = False
+                    self.write = False
 
-            if self.track:
-                pose = self.tracker_instance.get_pose(frame)
-                print('Pose [Rx Ry Rz x y z]:\n', pose)
+                if self.track:
+                    pose = self.tracker_instance.get_pose(frame)
+                    print('Pose [Rx Ry Rz x y z]:\n', pose)
 
-            qimage = QImage(frame, 1280, 480, QImage.Format_Grayscale8)
-            self.changePixmap.emit(qimage)
+                qimage = QImage(frame, self.camera.width, self.camera.height, self.camera.qformat)
+                self.changePixmap.emit(qimage)
 
 
 if __name__ == '__main__':
     from pyv4l2.camera import Camera
-    cam = Camera('/dev/video0')
+    # cam = Camera('/dev/video0')
+    from cameras import Webcam
+    cam = Webcam()
     app = QApplication([])
     from trackers import GUIStereoTracker
     tracker = None
