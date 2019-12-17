@@ -167,6 +167,7 @@ class MovieThread(QThread):
             self.write = True
 
     def run(self):
+        frame = np.zeros((480, 1280), dtype=np.uint8)
         while True:
             if self.camera:
                 frame, t = self.camera.get_frame()
@@ -186,25 +187,25 @@ class MovieThread(QThread):
                 else:
                     self.write = False
 
-                if self.track:
-                    pose = self.tracker_instance.get_pose(frame)
-                    print('Pose [Rx Ry Rz x y z]:\n', pose)
-
                 qimage = QImage(frame, self.camera.width, self.camera.height, self.camera.qformat)
                 self.changePixmap.emit(qimage)
+                
+            if self.track:
+                pose = self.tracker_instance.get_pose(frame)
 
 
 if __name__ == '__main__':
     from pyv4l2.camera import Camera
-    # cam = Camera('/dev/video0')
     from cameras import Webcam, LIOV7251Stereo
     # cam = Webcam()
     cam = LIOV7251Stereo('/dev/video0')
+    # cam = None
     app = QApplication([])
-    from trackers import GUIStereoTracker
-    tracker = None
-    tracker = GUIStereoTracker
+    from trackers import GUIStereoTracker, DummyTracker
+    # tracker = None
+    # tracker = GUIStereoTracker
+    tracker = DummyTracker
+    # tracker.verbose = False
     window = StartWindow(cam, tracker)
     window.show()
     app.exit(app.exec_())
-    cam.close()
