@@ -1,3 +1,6 @@
 [submodule "pyv4l2"]
 	path = pyv4l2
 	url = https://github.com/dhen2714/pyv4l2
+[submodule "StereoFeatureTracking"]
+	path = StereoFeatureTracking
+	url = https://github.com/dhen2714/StereoFeatureTracking
