@@ -1,5 +1,5 @@
 import time
-from mmt.motion_tracker import StereoFeatureTracker
+from mmt.tracker import StereoFeatureTracker
 from mmt.utils import load_stereo_views
 import numpy as np
 

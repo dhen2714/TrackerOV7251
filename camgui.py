@@ -71,7 +71,7 @@ class ImageDisplayWidget(QLabel):
 
 
 class StartWindow(QMainWindow):
-    def __init__(self, camera=None, tracker=None):
+    def __init__(self, camera=None, tracker=None, udp=None):
         super().__init__()
         self.camera = camera
 
@@ -104,7 +104,7 @@ class StartWindow(QMainWindow):
         self.button_frames.clicked.connect(self.get_frames)
         self.button_savedir.clicked.connect(self.get_savedir)
 
-        self.movie_thread = MovieThread(self.camera, tracker)
+        self.movie_thread = MovieThread(self.camera, tracker, udp)
         self.movie_thread.changePixmap.connect(self.image_display.update_image)
         self.button_track.clicked.connect(self.movie_thread.update_track)
         self.movie_thread.start()
@@ -138,7 +138,7 @@ class StartWindow(QMainWindow):
 
 class MovieThread(QThread):
     changePixmap = pyqtSignal(QImage)
-    def __init__(self, camera, tracker=None):
+    def __init__(self, camera, tracker=None, udp=None):
         super().__init__()
         self.camera = camera
         self.track = False
@@ -146,14 +146,13 @@ class MovieThread(QThread):
         self.write_num = 0
         self.savedir = None
         self.tracker = tracker
-        self.tracker_instance = None
+        self.udp = udp
 
     def update_track(self):
         if self.track:
             self.track = False
         else:
             if self.tracker:
-                self.tracker_instance = self.tracker()
                 self.track = True
             else:
                 print('No tracker available.')
@@ -191,21 +190,22 @@ class MovieThread(QThread):
                 self.changePixmap.emit(qimage)
                 
             if self.track:
-                pose = self.tracker_instance.get_pose(frame)
+                pose = self.tracker.get_pose(frame)
+                if self.udp:
+                    sent = udp.send_pose(pose)
+                    data, add = udp.receive()
 
 
 if __name__ == '__main__':
-    from pyv4l2.camera import Camera
     from cameras import Webcam, LIOV7251Stereo
-    # cam = Webcam()
-    cam = LIOV7251Stereo('/dev/video0')
-    # cam = None
-    app = QApplication([])
     from trackers import GUIStereoTracker, DummyTracker
-    # tracker = None
-    # tracker = GUIStereoTracker
-    tracker = DummyTracker
-    # tracker.verbose = False
-    window = StartWindow(cam, tracker)
+    from scanner import UDPConnection
+    cam = LIOV7251Stereo('/dev/video0')
+    app = QApplication([])
+
+    tracker = GUIStereoTracker()
+    # udp = UDPConnection()
+    tracker.verbose = False
+    window = StartWindow(cam, tracker, udp=None)
     window.show()
     app.exit(app.exec_())
