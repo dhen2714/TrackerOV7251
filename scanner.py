@@ -36,6 +36,7 @@ def vec2mat(Rx, Ry, Rz, x, y, z):
                     [0, 0, 0, 1]])
     tr = np.array([[1, 0, 0, x],
                     [0, 1, 0, y],
+                    
                     [0, 0, 1, z],
                     [0, 0, 0, 1]])
     return mdot(tr, t3, t2, t1)
@@ -52,8 +53,6 @@ class UDPConnection:
         self.send_size = 60
         self.rcv_size = 40
 
-        self.socket.bind((self.scanner_add, self.port))
-
     def sendto(self, data):
         sent = self.socket.sendto(data, (self.scanner_add, self.port))
         return sent
@@ -64,7 +63,7 @@ class UDPConnection:
 
     def send_pose(self, data):
         mat = vec2mat(*data)
-        buf = self.encode_motion_est(mat)
+        buf = self.encode_pose_est(mat)
         return self.sendto(buf)
 
     def encode_pose_est(self, motion):
@@ -115,7 +114,7 @@ class UDPConnection:
         b[6], b[7], b[8] = motion[1, :3]
         b[9], b[10], b[11] = motion[2, :3]
         b[12], b[13], b[14] = motion[:3, 3]
-        buf = struct.pack('iii' + 'f' * 12, *b)
+        buf = struct.pack('f' * 15, *b)
         return buf
 
     def decode_scanner_packet(self, data):
@@ -130,12 +129,18 @@ class UDPConnection:
         b = np.zeros(10, dtype=np.int32)
         return
 
+    def close(self):
+        self.socket.close()
+
 
 if __name__ == '__main__':
-    import numpy as np
-    motion = np.array([4,5,14,2,0,5])
+    pose = np.array([1.5,2.5,3.5,4.5,5.5,6.5])
     connection = UDPConnection()
-    for i in range(5):
 
-        connection.send_pose(motion)
-        connection.receive()
+    try:
+        sent = connection.send_pose(pose)
+        data, add = connection.receive()
+        print(data)
+
+    finally:
+        connection.close()
