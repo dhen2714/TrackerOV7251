@@ -175,9 +175,7 @@ class StartWindow(QMainWindow):
         self.camera.set_exposure(exp)
 
     def toggle_tracking(self):
-        print('Sisdf')
         if self.tracker:
-            print('What the fuck')
             if self.tracker.active:
                 self.tracker.active = False
             else:
@@ -204,6 +202,9 @@ class TrackerClientThread(QThread):
         remote_address = 'localhost'
         port = 4950
         client = AsyncoreClientUDP(remote_address, port, self.tracker)
+        self.tracker.active = True
+        # self.tracker.active = False
+        print('STarting asyncore...')
         asyncore.loop()
 
 

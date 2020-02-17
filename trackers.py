@@ -78,7 +78,7 @@ class DummyTracker:
 
 
 if __name__ == '__main__':
-    tracker = DummyTracker(latency=0.5)
+    tracker = DummyTracker(latency=0.1)
 
     while(True):
         pose = tracker.get_pose(None)
