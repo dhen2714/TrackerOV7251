@@ -65,9 +65,11 @@ class ImageDisplayWidget(QLabel):
         qimg = QImage(nullimg, self.width, self.height, self.qformat)
         self.setPixmap(QPixmap.fromImage(qimg))
 
-    @pyqtSlot(QImage)
-    def update_image(self, image):
-        self.setPixmap(QPixmap.fromImage(image))
+    @pyqtSlot(np.ndarray, int)
+    def update_image(self, image, t):
+        qimage = QImage(image, self.camera.width, self.camera.height, self.camera.qformat)
+        self.setPixmap(QPixmap.fromImage(qimage))
+        print(t)
 
 
 class StartWindow(QMainWindow):
@@ -111,10 +113,6 @@ class StartWindow(QMainWindow):
 
         self.savedir = None
 
-    @pyqtSlot(QImage)
-    def update_img(self, image):
-        self.img_widget.setPixmap(QPixmap.fromImage(image))
-
     def get_frame(self):
         self.movie_thread.update_write(1, self.savedir)
 
@@ -147,7 +145,7 @@ class StartWindow(QMainWindow):
 
 
 class MovieThread(QThread):
-    changePixmap = pyqtSignal(QImage)
+    changePixmap = pyqtSignal(np.ndarray, int)
     def __init__(self, camera, tracker=None, udp=None):
         super().__init__()
         self.camera = camera
@@ -198,8 +196,7 @@ class MovieThread(QThread):
                 else:
                     self.write = False
 
-                qimage = QImage(frame, self.camera.width, self.camera.height, self.camera.qformat)
-                self.changePixmap.emit(qimage)
+                self.changePixmap.emit(frame, t)
                 
             if self.track:
                 pose = self.tracker.get_pose(frame)
