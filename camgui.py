@@ -135,6 +135,16 @@ class StartWindow(QMainWindow):
         exp = self.widget_exp.slider.value()
         self.camera.set_exposure(exp)
 
+    def closeEvent(self, event):
+        """
+        Override of closeEvent, closes down all threads.
+        """
+        self.movie_thread.stop_running()
+        self.movie_thread.quit()
+        self.movie_thread.wait()
+
+        event.accept() # Let the window close.
+
 
 class MovieThread(QThread):
     changePixmap = pyqtSignal(QImage)
@@ -147,6 +157,8 @@ class MovieThread(QThread):
         self.savedir = None
         self.tracker = tracker
         self.udp = udp
+
+        self._running = True
 
     def update_track(self):
         if self.track:
@@ -167,7 +179,7 @@ class MovieThread(QThread):
 
     def run(self):
         frame = np.zeros((480, 1280), dtype=np.uint8)
-        while True:
+        while self._running:
             if self.camera:
                 frame, t = self.camera.get_frame()
 
@@ -194,6 +206,11 @@ class MovieThread(QThread):
                 if self.udp:
                     sent = udp.send_pose(pose)
                     data, add = udp.receive()
+
+    def stop_running(self):
+        self._running = False
+        if self.camera:
+            self.camera.close()
 
 
 if __name__ == '__main__':
