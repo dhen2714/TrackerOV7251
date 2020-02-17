@@ -35,6 +35,9 @@ class DummyTracker:
         self.add = True
 
         # self.verbose = True
+        self.send_ready = False
+        self.active = False
+        self.frame = None
 
     def get_pose(self, frame):
         time.sleep(self.latency)
@@ -54,6 +57,11 @@ class DummyTracker:
             self.switch_add()
 
         return pose
+
+    def calculate_pose(self):
+        time.sleep(self.latency)
+        print(np.mean(self.frame))
+        return self.pose
 
     def set_value(self, value):
         if self.add:
