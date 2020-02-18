@@ -3,7 +3,19 @@ import asyncore
 import cv2
 import numpy as np
 from PyQt5.QtCore import Qt, QThread, QTimer, pyqtSignal, pyqtSlot
-from PyQt5.QtWidgets import QMainWindow, QWidget, QPushButton, QVBoxLayout, QApplication, QSlider, QLabel, QLineEdit, QFormLayout, QInputDialog, QSlider
+from PyQt5.QtWidgets import (
+    QMainWindow, 
+    QWidget, 
+    QPushButton, 
+    QVBoxLayout, 
+    QApplication, 
+    QSlider, 
+    QLabel, 
+    QLineEdit, 
+    QFormLayout, 
+    QInputDialog, 
+    QSlider
+)
 from PyQt5.QtGui import QImage, QPixmap
 from tracker_client import AsyncoreClientUDP
 
@@ -46,6 +58,10 @@ class ExposureControlWidget(QWidget):
 
 
 class ImageDisplayWidget(QLabel):
+    """
+    Displays frame from camera stream.
+    If no camera connected, displays blank image.
+    """
     def __init__(self, camera=None):
         super().__init__()
         self.camera = camera
@@ -72,16 +88,21 @@ class ImageDisplayWidget(QLabel):
 
 
 class StartWindow(QMainWindow):
-    def __init__(self, camera=None, tracker=None, udp=None):
+    """Main GUI window."""
+    def __init__(self, camera=None, trackertype=None):
         super().__init__()
         self.camera = camera
 
         self.central_widget = QWidget()
         self.image_display = ImageDisplayWidget(self.camera)
-        self.button_frame = QPushButton('Acquire single frame', self.central_widget)
+        # Button to save a single camera image.
+        self.button_frame = QPushButton('Acquire single frame', 
+                                        self.central_widget)
+        # Button to toggle motion tracking.
         self.button_track = QPushButton('Toggle tracking', self.central_widget)
+        # Button to acquire multiple frames.
         self.button_frames = QPushButton('Acquire frames', self.central_widget)
-
+        # Slider for exposure control.
         self.widget_exp = ExposureControlWidget(self.camera)
 
         # Add save directory option.
@@ -101,24 +122,30 @@ class StartWindow(QMainWindow):
         self.layout.addWidget(self.button_track)
         self.setCentralWidget(self.central_widget)
 
+        # Button clicked triggers.
         self.button_frame.clicked.connect(self.save_frame)
         self.button_frames.clicked.connect(self.save_frames)
         self.button_savedir.clicked.connect(self.get_savedir)
-
-        self.trackerclient_thread = TrackerClientThread(tracker)
-        self.trackerclient_thread.start()
-
-        self.movie_thread = MovieThread(self.camera, tracker, udp)
-        self.movie_thread.send_frame.connect(self.update_frame)
         self.button_track.clicked.connect(self.toggle_tracking)
+
+        # Tracker client thread will start when tracking is toggled.
+        self.trackerclient_thread = None
+
+        # Thread for displaying camera feed.
+        self.movie_thread = MovieThread(self.camera)
+        self.movie_thread.send_frame.connect(self.update_frame)
         self.movie_thread.start()
 
-        self.savedir = None
-        self.write = False
-        self.write_num = 0
+        self.savedir = None # Directory to write images to.
+        self.write = False # If writing images to disc.
+        self.write_num = 0 # Number of images to write.
 
-        self.track = False
-        self.tracker = tracker
+        self.trackertype = trackertype
+        if self.trackertype:
+            self.tracker = trackertype()
+        else:
+            self.tracker = None
+        self.track = False # Set to True if tracking is on.
 
     @pyqtSlot(np.ndarray, int)
     def update_frame(self, frame, timestamp):
@@ -126,7 +153,8 @@ class StartWindow(QMainWindow):
         Pulls latest frame from the camera stream, updates image display.
         Writes to disk if option toggled.
         """
-        qimage = QImage(frame, self.camera.width, self.camera.height, self.camera.qformat)
+        qimage = QImage(frame, self.camera.width, self.camera.height, 
+                        self.camera.qformat)
         self.image_display.update_image(qimage)
         if self.tracker:
             self.tracker.frame = frame
@@ -138,7 +166,9 @@ class StartWindow(QMainWindow):
             else:
                 outpath = outname
             # Color has been converted to RGB on the camera end.
-            if cv2.imwrite(outpath, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)):
+            if self.camera.savefmt == '.png':
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            if cv2.imwrite(outpath, frame):
                 print('Image saved:', outpath)
             else:
                 print('Could not save to', outpath)
@@ -147,6 +177,9 @@ class StartWindow(QMainWindow):
             self.write = False
 
     def update_write(self, write_num, savedir=None):
+        """
+        Updates number of frames to write, activated by 'write frames' button.
+        """
         self.savedir = savedir
         if self.write:
             print('Already writing!')
@@ -155,40 +188,54 @@ class StartWindow(QMainWindow):
             self.write = True
 
     def save_frame(self):
+        """Calls update_write() for a single frame."""
         self.update_write(1, self.savedir)
 
     def save_frames(self):
-        numframes, ret = QInputDialog.getInt(self, 'Input', 'Enter number of frames to write (>0):')
+        """Calss update_write() for multiple frames."""
+        numframes, ret = QInputDialog.getInt(self, 'Input', 
+            'Enter number of frames to write (>0):')
         if ret and numframes > 0:
             self.update_write(numframes, self.savedir)
 
     def get_savedir(self):
-        savedir, ret = QInputDialog.getText(self, 'Input', 'Enter path to directory in which images are to be saved:')
+        """Input for changing the directory to which images are saved."""
+        savedir, ret = QInputDialog.getText(self, 'Input', 'Enter path to \
+            directory in which images are to be saved:')
         if ret:
             self.savedir = str(savedir)
             self.line_edit_savedir.setText(str(savedir))
             self.label_savedir.setText(str(savedir))
 
     def change_exposure(self):
-        # exp = self.slider_exp.value()
+        """Triggered by moving exposure control slider."""
         exp = self.widget_exp.slider.value()
         self.camera.set_exposure(exp)
 
     def toggle_tracking(self):
+        """Toggle tracking on/off. Starts/ends tracking thread."""
         if self.tracker:
             if self.tracker.active:
                 self.tracker.active = False
+                if self.trackerclient_thread:
+                    self.trackerclient_thread.thread_close()
+                # Reset tracker after not in use.
+                self.tracker = self.trackertype()
             else:
                 self.tracker.active = True
                 print('Tracker turned on')
+                self.trackerclient_thread = TrackerClientThread(self.tracker)
+                self.trackerclient_thread.start()
+        else:
+            print('No tracker available!')
 
     def closeEvent(self, event):
         """
         Override of closeEvent, closes down all threads.
         """
-        self.movie_thread.stop_running()
-        self.movie_thread.quit()
-        self.movie_thread.wait()
+        self.movie_thread.thread_close()
+        if self.trackerclient_thread:
+            self.trackerclient_thread.thread_close()
         event.accept() # Let the window close.
 
 
@@ -202,31 +249,23 @@ class TrackerClientThread(QThread):
         remote_address = 'localhost'
         port = 4950
         client = AsyncoreClientUDP(remote_address, port, self.tracker)
-        self.tracker.active = True
-        # self.tracker.active = False
-        print('STarting asyncore...')
+        # while self.tracker.active:
+            # asyncore.loop(count=1)
         asyncore.loop()
+
+    def thread_close(self):
+        print('Stopping tracking thread, this may throw an exception...')
+        asyncore.close_all()
+        self.quit()
+        self.wait()
 
 
 class MovieThread(QThread):
     send_frame = pyqtSignal(np.ndarray, int)
-    def __init__(self, camera, tracker=None, udp=None):
+    def __init__(self, camera):
         super().__init__()
         self.camera = camera
-        self.track = False
-        self.tracker = tracker
-        self.udp = udp
-
         self._running = True
-
-    def update_track(self):
-        if self.track:
-            self.track = False
-        else:
-            if self.tracker:
-                self.track = True
-            else:
-                print('No tracker available.')
 
     def run(self):
         frame = np.zeros((480, 1280), dtype=np.uint8)
@@ -235,17 +274,13 @@ class MovieThread(QThread):
                 frame, t = self.camera.get_frame()
 
                 self.send_frame.emit(frame, t)
-                
-            if self.track:
-                pose = self.tracker.get_pose(frame)
-                if self.udp:
-                    sent = udp.send_pose(pose)
-                    data, add = udp.receive()
 
-    def stop_running(self):
+    def thread_close(self):
         self._running = False
         if self.camera:
             self.camera.close()
+        self.quit()
+        self.wait()
 
 
 if __name__ == '__main__':
