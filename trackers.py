@@ -11,7 +11,7 @@ class GUIStereoTracker(StereoFeatureTracker):
         view1, view2 = load_stereo_views('Stereo_calibration_2409_0_1.npz')
         super().__init__(view1, view2)
 
-        # self.verbose = True
+        self.frame = None # Current frame, as an image.
         
     def get_pose(self, frame):
         f1 = frame[:, 640:]
@@ -21,23 +21,36 @@ class GUIStereoTracker(StereoFeatureTracker):
             print('Pose [Rx Ry Rz x y z]:\n', pose)
         return pose
 
+    def calculate_pose(self):
+        frame = self.frame
+        return self.get_pose(frame)
+
     
 class DummyTracker:
     verbose = True
+    latency = 0.5
+    max_val = 10
 
-    def __init__(self, latency=0.5, max_val=10):
+    def __init__(self):
         self.count1 = 0
         self.count2 = 0
         self.pose = np.zeros(6)
-        self.latency = latency
-        self.max_val = max_val
 
         self.add = True
 
-        # self.verbose = True
         self.send_ready = False
         self.active = False
         self.frame = None
+
+    #     self._latency = latency
+
+    # @property
+    # def latency(self):
+    #     return self.latency
+
+    # @property
+    # def max_val(self):
+    #     return self.max_val
 
     def get_pose(self, frame):
         time.sleep(self.latency)
@@ -59,9 +72,8 @@ class DummyTracker:
         return pose
 
     def calculate_pose(self):
-        time.sleep(self.latency)
-        print(np.mean(self.frame))
-        return self.pose
+        frame = self.frame
+        return self.get_pose(frame)
 
     def set_value(self, value):
         if self.add:
