@@ -161,8 +161,9 @@ class AsyncoreClientUDP(asyncore.dispatcher):
         try:
             b = struct.unpack('i'*10, data)
             print(b[0])
-            print('Received {} bytes from {}'.format(len(data), addr))
+            print('Received {} bytes from {}'.format(len(data), self.server))
         except Exception as e:
+            print('Error decoding.')
             pass
 
 
