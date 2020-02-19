@@ -4,10 +4,11 @@ import numpy
 
 requirements = [
     'setuptools>=18.0',
-    'opencv-python==3.4.2.17',
-    'opencv-contrib-python==3.4.2.17',
+    'opencv-python<=3.4.2.17',
+    'opencv-contrib-python<=3.4.2.17',
     'pandas',
     'sklearn'
+    'PyQt5'
 ]
 
 extensions = [
@@ -28,10 +29,11 @@ setup(
     #version=__version__,
     setup_requires=['cython'],
     install_requires=requirements,
-    packages=['Pyv4l2/pyv4l2', 'MarkerlessTracking/mmt'],
+    packages=['Pyv4l2/pyv4l2', 'StereoFeatureTracking/mmt'],
     # packages=find_packages(),
     description='libv4l2 based frame grabber for OV580-OV7251',
     license='GNU Lesser General Public License v3 (LGPLv3)',
     ext_modules=cythonize(extensions, compiler_directives={'language_level' : '3'}),
-    zip_safe=False
+    zip_safe=False,
+    python_requires='<3.8'
 )
