@@ -3,6 +3,7 @@ import asyncore
 import struct
 import sys
 import time
+import logging
 import numpy as np
 
 
@@ -113,7 +114,7 @@ def encode_pose_est(pose):
 
 class AsyncoreClientUDP(asyncore.dispatcher):
 
-    def __init__(self, server, port, tracker):
+    def __init__(self, server, port, tracker, outputlog=None):
         self.server = server
         self.port = port
         self.tracker = tracker
@@ -124,6 +125,21 @@ class AsyncoreClientUDP(asyncore.dispatcher):
 
         self.recv_errcount = 0
 
+        # For logging purposes.
+        self.logger = logging.getLogger(__name__)
+
+        # self.logger.setLevel(logging.INFO)
+        self.formatter = logging.Formatter('%(asctime)s:%(name)s:%(message)s')
+
+        self.stream_handler = logging.StreamHandler()
+        self.stream_handler.setFormatter(self.formatter)
+        self.logger.addHandler(self.stream_handler)
+
+        if outputlog:
+            self.file_handler = logging.FileHandler(outputlog)
+            self.file_handler.setFormatter(self.formatter)
+            self.logger.addHandler(self.file_handler)
+
     def writable(self):
         # print('Check')
         return self.tracker.active
@@ -132,16 +148,16 @@ class AsyncoreClientUDP(asyncore.dispatcher):
         pose = self.tracker.calculate_pose()
         buf = encode_pose_est(vec2mat(*pose))
         sent = self.socket.sendto(buf, (self.server, self.port))
-        print('Sent {} bytes to {}'.format(sent, self.server))
+        self.logger.info('Sent {} bytes to {}'.format(sent, self.server))
 
     # Once a "connection" is made do this stuff.
     def handle_connect(self):
-        print('Connected')
+        self.logger.info('Connected')
 
     # If a "connection" is closed do this stuff.
     def handle_close(self):
         """Implied by a read event with no data available."""
-        print('No data received...')
+        self.logger.info('No data received...')
 
     def readable(self):
         return self.tracker.active
@@ -156,15 +172,17 @@ class AsyncoreClientUDP(asyncore.dispatcher):
                 # faster than the tracker.
                 data = self.recv(self.recv_size)
         except Exception as e:
+            self.logger.debug(e)
             self.recv_errcount += 1
         
         try:
             b = struct.unpack('i'*10, data)
-            print(b[0])
-            print('Received {} bytes from {}'.format(len(data), self.server))
+            self.logger.debug(b[0])
+            self.logger.info('Received {} bytes from {}'.format(len(data), 
+                self.server))
         except Exception as e:
-            print('Error decoding.')
-            pass
+            self.logger.debug('Error decoding.')
+            self.logger.debug(e)
 
 
 if __name__ == '__main__':

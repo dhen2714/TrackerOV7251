@@ -90,7 +90,7 @@ class ImageDisplayWidget(QLabel):
 class StartWindow(QMainWindow):
     """Main GUI window."""
     def __init__(self, camera=None, trackertype=None, remote_address='', 
-        port=4950):
+        port=4950, clientlog=None):
         super().__init__()
         self.camera = camera
 
@@ -133,6 +133,7 @@ class StartWindow(QMainWindow):
         self.trackerclient_thread = None
         self.remote_address = remote_address
         self.port = port
+        self.clientlog = clientlog
 
         # Thread for displaying camera feed.
         self.movie_thread = MovieThread(self.camera)
@@ -230,7 +231,8 @@ class StartWindow(QMainWindow):
                 self.trackerclient_thread = TrackerClientThread(
                     self.tracker, 
                     self.remote_address, 
-                    self.port
+                    self.port,
+                    self.clientlog
                 )
                 self.trackerclient_thread.start()
         else:
@@ -247,7 +249,7 @@ class StartWindow(QMainWindow):
 
 
 class TrackerClientThread(QThread):
-    def __init__(self, tracker, remote_address, port):
+    def __init__(self, tracker, remote_address, port, clientlog=None):
         super().__init__()
         self.tracker = tracker
         self.remote_address = remote_address
@@ -255,7 +257,8 @@ class TrackerClientThread(QThread):
         self.client = AsyncoreClientUDP(
             self.remote_address, 
             self.port, 
-            self.tracker
+            self.tracker,
+            clientlog
         )
         print('Tracking thread started.')
 
