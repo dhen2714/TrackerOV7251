@@ -1,17 +1,77 @@
 import time
+import logging
 from mmt.tracker import StereoFeatureTracker
-from mmt.utils import load_stereo_views
+from mmt.utils import load_stereo_views, vec2mat, mat2vec
 import numpy as np
+
+
+class TrackingWrapper:
+    """Wrapper class for motion trackers."""
+
+    def __init__(self, tracker=None, cross_calibration=None, outputlog=None):
+        if tracker:
+            self.tracker = tracker
+        else:
+            self.tracker = DummyTracker()
+
+        if cross_calibration:
+            self.xcal = np.load(cross_calibration)
+        else:
+            self.xcal = np.eye(4)
+        self.xcal_inv = np.linalg.inv(self.xcal)
+
+        self.frame = None
+        self.initial_position = np.eye(4)
+        self.table_loc = 0
+
+        self.logger = logging.getLogger(__name__)
+        self.formatter = logging.Formatter('%(asctime)s:%(name)s:%(levelname)s:%(message)s')
+
+        self.stream_handler = logging.StreamHandler()
+        self.stream_handler.setFormatter(self.formatter)
+        self.logger.addHandler(self.stream_handler)
+
+        if outputlog:
+            self.file_handler = logging.FileHandler(outputlog)
+            self.file_handler.setFormatter(self.formatter)
+            self.logger.addHandler(self.file_handler)
+
+    def calculate_pose(self):
+        frame = self.frame
+        pose = self.tracker.get_pose(frame)
+        posemat = vec2mat(pose)
+        outpose = self.xcal.dot(posemat).dot(self.xcal_inv).dot(self.initial_position)
+        self.logger.info(('Pose [Rx Ry Rz x y z]:\n', mat2vec(outpose)))
+        return outpose
+
+    def update_initial_pos(self, new_pos):
+        self.initial_position = new_pos
+
+    def update_xcal(self, new_xcal):
+        self.xcal = new_xcal
+        self.xcal_inv = np.linalg.inv(new_xcal)
+
+    def update_table(self, new_val):
+        if np.abs(new_val) > 1e-2:
+            T_table = np.eye(4)
+            T_table[2,3] = new_val - self.table_loc
+            new_xcal = T_table.dot(self.xcal)
+            self.update_xcal(new_xcal)
 
 
 class GUIStereoTracker(StereoFeatureTracker):
     verbose = True
     
-    def __init__(self):
+    def __init__(self, cross_calibration=None):
         view1, view2 = load_stereo_views('Stereo_calibration_2409_0_1.npz')
         super().__init__(view1, view2)
+        if cross_calibration:
+            self.cross_calibration = np.load(cross_calibration)
+        else:
+            self.cross_calibration = np.eye(4)
 
         self.frame = None # Current frame, as an image.
+        self.initial_position = None
         
     def get_pose(self, frame):
         f1 = frame[:, 640:]
