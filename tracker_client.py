@@ -108,7 +108,7 @@ def encode_pose_est(pose):
     b[6], b[7], b[8] = pose[1, :3]
     b[9], b[10], b[11] = pose[2, :3]
     b[12], b[13], b[14] = pose[:3, 3]
-    buf = struct.pack('f' * 15, *b)
+    buf = struct.pack('>'+'f'*15, *b)
     return buf
 
 
@@ -129,7 +129,7 @@ class AsyncoreClientUDP(asyncore.dispatcher):
         self.logger = logging.getLogger(__name__)
 
         # self.logger.setLevel(logging.INFO)
-        self.formatter = logging.Formatter('%(asctime)s:%(name)s:%(message)s')
+        self.formatter = logging.Formatter('%(asctime)s:%(name)s:%(levelname)s:%(message)s')
 
         self.stream_handler = logging.StreamHandler()
         self.stream_handler.setFormatter(self.formatter)
